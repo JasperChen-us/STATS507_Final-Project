@@ -1,0 +1,42 @@
+{
+  "sample": {
+    "total_rows": 396,
+    "start_date": "2025-03-13",
+    "end_date": "2026-04-13"
+  },
+  "model_type": "TensorFlow Transformer encoder",
+  "btc_only_model": {
+    "train_size": 18,
+    "test_size": 365,
+    "sequence_length": 14,
+    "threshold": 0.55,
+    "backtest_start": "2025-04-14",
+    "backtest_end": "2026-04-13",
+    "accuracy": 0.5123287671232877,
+    "precision": 0.5151515151515151,
+    "recall": 0.37362637362637363,
+    "f1": 0.43312101910828027,
+    "roc_auc": 0.5078664504894014
+  },
+  "btc_plus_polymarket_model": {
+    "train_size": 18,
+    "test_size": 365,
+    "sequence_length": 14,
+    "threshold": 0.5,
+    "backtest_start": "2025-04-14",
+    "backtest_end": "2026-04-13",
+    "accuracy": 0.5041095890410959,
+    "precision": 0.5021834061135371,
+    "recall": 0.6318681318681318,
+    "f1": 0.559610705596107,
+    "roc_auc": 0.48642887167477333
+  },
+  "strategies": {
+    "btc_strategy_total_return": -0.005044127361521156,
+    "btc_strategy_avg_daily_return": 0.0001793499713937472,
+    "btc_strategy_sharpe": 0.14532482615231823,
+    "pm_strategy_total_pnl": 74.5,
+    "pm_strategy_avg_daily_pnl": 0.20410958904109588,
+    "pm_strategy_hit_rate": 0.5041095890410959
+  }
+}

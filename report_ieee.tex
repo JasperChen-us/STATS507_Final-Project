@@ -1,0 +1,166 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Can Polymarket Improve Bitcoin Direction Forecasting?\\
+\large A Transformer-Based Comparison with One-Year Backtesting}
+
+\author{\IEEEauthorblockN{Taoyi Chen}
+\IEEEauthorblockA{\textit{STATS 507 Final Project} \\
+\textit{University of Michigan}\\
+Ann Arbor, MI, USA}
+}
+
+\maketitle
+
+\begin{abstract}
+This project studies whether Bitcoin-related prediction market information from Polymarket improves one-day-ahead Bitcoin direction forecasting. I combine daily Bitcoin OHLCV data from Yahoo Finance with trade-based features extracted from Polymarket's daily \emph{Bitcoin Up or Down on [date]?} contracts. Two Transformer encoder models are trained: a BTC-only model and a BTC+Polymarket model. The evaluation uses a one-year backtest from April 14, 2025 to April 13, 2026. After tuning sequence length and decision thresholds, the BTC-only Transformer achieves 51.2\% accuracy and 0.508 ROC-AUC, while the BTC+Polymarket Transformer achieves 50.4\% accuracy, 0.560 F1, and 0.486 ROC-AUC. Trading results differ by implementation: a BTC long-only strategy based on the BTC+Polymarket model is nearly flat, while a stylized Polymarket strategy that buys the predicted side at price 0.3 is strongly profitable under the stated payoff assumption. The results suggest that this Polymarket signal is useful for directional recall and event-style trading rules, but does not clearly outperform BTC-only features in raw classification accuracy over the one-year sample.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Bitcoin, Polymarket, Transformer, prediction markets, backtesting, time series classification
+\end{IEEEkeywords}
+
+\section{Introduction}
+Prediction markets aggregate beliefs about future events into tradable prices. In principle, Bitcoin-related contracts on Polymarket may contain crowd information that complements historical market data. This project asks a practical question: can Polymarket improve one-day-ahead prediction of Bitcoin direction, and can those predictions support simple trading strategies?
+
+The empirical design follows the proposal's main comparison. First, I train a model using only Bitcoin price information. Second, I train a model that augments Bitcoin features with Polymarket-derived signals. The target is whether Bitcoin closes higher on the next day. I then compare predictive metrics and evaluate two strategies based on the BTC+Polymarket model: a BTC strategy that goes long when the model predicts up, and a Polymarket strategy that buys the predicted side of the daily up/down contract.
+
+\section{Data}
+\subsection{Bitcoin Data}
+Bitcoin daily open, high, low, close, and volume data are downloaded from Yahoo Finance for the period January 1, 2025 to April 15, 2026. From these values I construct return, volatility, momentum, moving-average-ratio, and intraday-range features.
+
+\subsection{Polymarket Data}
+Polymarket event discovery focuses on daily contracts of the form \emph{Bitcoin Up or Down on [date]?}. For each target day, public search is used to identify the correct event and its token identifiers. Then trade history is downloaded from the Polymarket data API. From pre-resolution trades I construct market-implied signals, including:
+\begin{itemize}
+\item last implied up probability,
+\item mean implied up probability,
+\item change in implied up probability,
+\item trade count,
+\item total traded notional.
+\end{itemize}
+
+The merged sample spans March 13, 2025 through April 13, 2026, for 396 daily observations. Because this Polymarket market family begins only in March 2025, extending the backtest to one year leaves a short pre-backtest training period. This is an important limitation when interpreting model quality.
+
+\section{Methodology}
+\subsection{Prediction Target}
+The binary label is
+\[
+y_t = \mathbb{1}\{ \text{Close}_{t+1} > \text{Close}_t \},
+\]
+which indicates whether Bitcoin moves up from day $t$ to day $t+1$.
+
+\subsection{Transformer Models}
+Both models use the same TensorFlow Transformer encoder architecture. The input is a rolling sequence of standardized daily features. The network consists of:
+\begin{itemize}
+\item a linear projection to dimension 32,
+\item two Transformer encoder blocks with multi-head self-attention,
+\item global average pooling,
+\item a dense hidden layer,
+\item a sigmoid output for up/down probability.
+\end{itemize}
+
+Missing values are imputed with training-sample medians and all features are standardized using only training data.
+
+\subsection{Model Specifications}
+I tune sequence length and threshold for the one-year backtest setting. The final specifications are:
+\begin{itemize}
+\item BTC-only Transformer: 14-day sequence, threshold 0.55.
+\item BTC+Polymarket Transformer: 14-day sequence, threshold 0.50.
+\end{itemize}
+
+The BTC+Polymarket model uses a smaller Polymarket feature subset after tuning, because the full feature set did not improve accuracy.
+
+\subsection{Backtesting Rules}
+The one-year backtest runs from April 14, 2025 to April 13, 2026.
+
+\textbf{BTC strategy:} if the BTC+Polymarket model predicts up, buy Bitcoin at the open and sell at the close of the same day; otherwise hold cash.
+
+\textbf{Polymarket strategy:} each day, buy the predicted side at price 0.3. If the prediction is correct, the contract settles at 1 and net profit is $+0.7$. If the prediction is wrong, the payoff is 0 and net profit is $-0.3$.
+
+\section{Results}
+Table~\ref{tab:metrics} reports predictive performance. The BTC-only model has slightly higher accuracy and ROC-AUC. However, the BTC+Polymarket model has materially higher recall and F1, indicating that it is more aggressive in identifying up moves. This difference matters for trading rules that always take a position.
+
+\begin{table}[htbp]
+\caption{One-Year Backtest Predictive Metrics}
+\label{tab:metrics}
+\centering
+\begin{tabular}{lccccc}
+\toprule
+Model & Acc. & Prec. & Rec. & F1 & AUC \\
+\midrule
+BTC-only Transformer & 0.512 & 0.515 & 0.374 & 0.433 & 0.508 \\
+BTC+Polymarket Transformer & 0.504 & 0.502 & 0.632 & 0.560 & 0.486 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:strategy} reports backtest performance for the BTC+Polymarket model. The BTC strategy is roughly flat over the one-year test, with total return close to zero. In contrast, the stylized Polymarket strategy is profitable because the hit rate is slightly above 50\%, while the assumed payoff ratio is favorable at 0.3 entry cost and 1.0 settlement value.
+
+\begin{table}[htbp]
+\caption{Strategy Results for BTC+Polymarket Transformer}
+\label{tab:strategy}
+\centering
+\begin{tabular}{lc}
+\toprule
+Metric & Value \\
+\midrule
+BTC strategy total return & $-0.005$ \\
+BTC strategy daily average return & $0.00018$ \\
+BTC strategy Sharpe ratio & $0.145$ \\
+Polymarket strategy total PnL & $74.5$ \\
+Polymarket strategy daily average PnL & $0.204$ \\
+Polymarket strategy hit rate & $0.504$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Fig.~\ref{fig:equity} shows the equity curves. The BTC curve stays near flat, while the Polymarket curve rises steadily under the simplified payoff structure.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{outputs/strategy_equity_curves.png}}
+\caption{Equity curves for the BTC and Polymarket strategies over the one-year backtest.}
+\label{fig:equity}
+\end{figure}
+
+\section{Discussion}
+The main conclusion is mixed. Adding Polymarket does not improve raw classification accuracy in this sample, but it does produce a model with stronger recall and F1. For a trader who wants to take directional positions more often, that may still be useful.
+
+At the same time, several limitations remain. First, the one-year backtest forces a short training window because the daily BTC up/down Polymarket market family only begins in March 2025. Second, the Polymarket strategy assumes constant execution at price 0.3, which is a stylized rather than historical execution rule. Third, the BTC strategy ignores transaction costs and slippage.
+
+These results therefore should be interpreted as a project-level proof of concept rather than a production trading system. The next improvement would be to incorporate a broader Polymarket feature universe, such as weekly contracts, monthly contracts, threshold markets, and especially order book information, in order to expand the training sample without shrinking the test period.
+
+\section{Conclusion}
+This project leads to two main conclusions. First, the results do not show higher classification accuracy after adding Polymarket data. A likely reason is that the current feature set only uses trade-based information from public endpoints. More informative microstructure variables, especially order book depth, spread, and liquidity imbalance, were not included because they were harder to access and organize in a clean historical panel. Those omitted variables may contain much stronger prediction-market information than the simplified features used here.
+
+Second, the backtest shows why binary prediction markets are still interesting even when directional accuracy is only modest. In the Polymarket setting, a correct prediction can generate a large payoff relative to the entry price, so a hit rate only slightly above 50\% can still produce strong profits under the stylized rule used in this project. By contrast, in the BTC market it is much harder to translate directional forecasts into profits. Transaction fees, implementation costs, and the cost of shorting all reduce performance, and a trader may still fail to profit even when the sign prediction is correct if the daily move is too small. This makes binary markets a potentially better trading environment than spot BTC for models that are mainly good at forecasting direction rather than return magnitude.
+
+\begin{thebibliography}{00}
+\bibitem{yf}
+Yahoo Finance, ``BTC-USD historical price data,'' accessed April 14, 2026. [Online]. Available: \url{https://finance.yahoo.com/quote/BTC-USD/}
+
+\bibitem{pmapi}
+Polymarket, ``Gamma API / public event and market data,'' accessed April 14, 2026. [Online]. Available: \url{https://docs.polymarket.com/}
+
+\bibitem{capponi}
+A. Capponi, P. Wang, and Y. Zhang, ``Semantic trading: Agentic AI for clustering and relationship discovery in prediction markets,'' 2025.
+
+\bibitem{saguillo}
+P. Saguillo, J. D. Fermanian, and coauthors, ``Unravelling the probabilistic forest: Arbitrage in prediction markets,'' 2025.
+
+\bibitem{turtel}
+E. Turtel and coauthors, ``Outcome-based reinforcement learning to predict the future,'' 2025.
+\end{thebibliography}
+
+\end{document}
